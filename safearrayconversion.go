@@ -3,6 +3,7 @@
 package ole
 
 import (
+	"fmt"
 	"unsafe"
 )
 
@@ -32,10 +33,87 @@ func (sac *SafeArrayConversion) ToByteArray() (bytes []byte) {
 	return
 }
 
+const sizeOfUintPtr = unsafe.Sizeof(uintptr(0))
+
+func uintptrToBytes(u *uintptr) []byte {
+	return (*[sizeOfUintPtr]byte)(unsafe.Pointer(u))[:]
+}
+
+func printValueAtMemoryLocation(location uintptr, next int) {
+	var v byte
+	p := unsafe.Pointer(location)
+	fmt.Println("8 Bit Memory \n")
+	for i := 1; i < next; i++ {
+		p = unsafe.Pointer(location)
+		v = *((*byte)(p))
+		fmt.Print(v, " ")
+		//fmt.Println("Loc : ", loc, " --- Val : ", v)
+		location++
+	}
+	fmt.Println("\n")
+}
+
+func printValueAtMemoryLocation16(location uintptr, next int) {
+	var v int16
+	p := unsafe.Pointer(location)
+	fmt.Println("16 Bit Memory \n")
+	for i := 1; i < next; i++ {
+		p = unsafe.Pointer(location)
+		v = *((*int16)(p))
+		fmt.Print(v, " ")
+		//fmt.Println("Loc : ", loc, " --- Val : ", v)
+		location += 2
+	}
+	fmt.Println("\n")
+}
+func printValueAtMemoryLocation32(location uintptr, next int) {
+	var v int32
+	p := unsafe.Pointer(location)
+	fmt.Println("32 Bit Memory \n")
+	for i := 1; i < next; i++ {
+		p = unsafe.Pointer(location)
+		v = *((*int32)(p))
+		fmt.Print(v, " ")
+		//fmt.Println("Loc : ", loc, " --- Val : ", v)
+		location += 4
+	}
+	fmt.Println("\n")
+}
+
+func (sac *SafeArrayConversion) GetData() ([]byte, error) {
+	bytes := make([]byte, 200)
+	data, err := safeArrayAccessData(sac.Array)
+	if err != nil {
+		return nil, err
+	}
+
+	// d := (*byte)(unsafe.Pointer(data))
+
+	// fmt.Println(data, uintptrToBytes(&data))
+	printValueAtMemoryLocation(data, 200)
+	printValueAtMemoryLocation16(data, 100)
+	printValueAtMemoryLocation32(data, 50)
+
+	err = safeArrayUnaccessData(sac.Array)
+	if err != nil {
+		return nil, err
+	}
+	return bytes, nil
+}
+
+func (sac *SafeArrayConversion) GetVarType() VT {
+	vt, _ := safeArrayGetVartype(sac.Array)
+	return VT(vt)
+}
+
 func (sac *SafeArrayConversion) ToValueArray() (values []interface{}) {
+	vt, _ := safeArrayGetVartype(sac.Array)
+	return sac.ToValueArrayWithType(VT(vt))
+}
+
+func (sac *SafeArrayConversion) ToValueArrayWithType(vt VT) (values []interface{}) {
 	totalElements, _ := sac.TotalElements(0)
 	values = make([]interface{}, totalElements)
-	vt, _ := safeArrayGetVartype(sac.Array)
 
 	for i := int32(0); i < totalElements; i++ {
 		switch VT(vt) {
@@ -84,7 +162,7 @@ func (sac *SafeArrayConversion) ToValueArray() (values []interface{}) {
 			safeArrayGetElement(sac.Array, i, unsafe.Pointer(&v))
 			values[i] = v
 		case VT_BSTR:
-			v , _ := safeArrayGetElementString(sac.Array, i)
+			v, _ := safeArrayGetElementString(sac.Array, i)
 			values[i] = v
 		case VT_VARIANT:
 			var v VARIANT
